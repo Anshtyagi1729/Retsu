@@ -16,9 +16,9 @@ func Process(j job.Job) error {
 	}
 	// idempotency checks later and allthat shit
 	time.Sleep(500 * time.Millisecond)
-	if rand.Float64() < 0.1 {
-		return errors.New("gateways faillllledddd!!!!ohno!!")
+	if rand.Float64() < 0.5 {
+		return errors.New("gateways faillllledddd!!!!")
 	}
-	log.Printf("successsssssfull paymentt!!")
+	log.Printf("SUCCES67SS!!")
 	return nil
 }

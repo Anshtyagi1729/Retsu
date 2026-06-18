@@ -46,11 +46,11 @@ func (w *Worker) Start(ctx context.Context) {
 			}
 			j.Attempts++
 			err = processor.Process(j)
+			w.queue.Ack(ctx, data)
 			if err != nil {
 				w.queue.Fail(ctx, j)
 				continue
 			}
-			w.queue.Ack(ctx, data)
 		}
 	}
 }
@@ -75,6 +75,20 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 		case <-tick.C:
 			if err := w.queue.Schedule(ctx); err != nil {
 				log.Printf("scheduler says:%v", err)
+			}
+		}
+	}
+}
+func (w *Worker) RunWatchdawg(ctx context.Context) {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if err := w.queue.InflightCleanup(ctx); err != nil {
+				log.Printf("WatchDawg says:%v", err)
 			}
 		}
 	}
