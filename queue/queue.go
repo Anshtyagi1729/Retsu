@@ -18,6 +18,12 @@ const (
 	DLQkey      = "retsu:dlq"
 )
 
+type Stats struct {
+	Pending  int64 `json:"pending"`
+	Inflight int64 `json:"inflight"`
+	Retry    int64 `json:"retry"`
+	DLQ      int64 `json:"dlq"`
+}
 type Queue struct {
 	client *redis.Client
 }
@@ -68,6 +74,7 @@ func (q *Queue) Fail(ctx context.Context, j job.Job) error {
 		Score:  score,
 		Member: data,
 	}).Err()
+
 }
 func (q *Queue) Schedule(ctx context.Context) error {
 	data, err := q.client.ZRangeArgs(ctx, redis.ZRangeArgs{
@@ -90,4 +97,43 @@ func (q *Queue) Schedule(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+func (q *Queue) InflightCleanup(ctx context.Context) error {
+	data, err := q.client.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:     InflightKey,
+		Start:   "0",
+		Stop:    strconv.FormatInt(time.Now().Unix(), 10),
+		ByScore: true,
+	}).Result()
+	if err != nil {
+		return err
+	}
+	for _, j := range data {
+		if err := q.client.LPush(ctx, PendingKey, j).Err(); err != nil {
+			return err
+		}
+		if err := q.client.ZRem(ctx, InflightKey, j).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (q *Queue) Stats(ctx context.Context) (Stats, error) {
+	pending, err := q.client.LLen(ctx, PendingKey).Result()
+	if err != nil {
+		return Stats{}, err
+	}
+	inflight, err := q.client.ZCard(ctx, InflightKey).Result()
+	if err != nil {
+		return Stats{}, err
+	}
+	retry, err := q.client.ZCard(ctx, RetryKey).Result()
+	if err != nil {
+		return Stats{}, err
+	}
+	dlq, err := q.client.LLen(ctx, DLQkey).Result()
+	if err != nil {
+		return Stats{}, err
+	}
+	return Stats{Pending: pending, Inflight: inflight, Retry: retry, DLQ: dlq}, nil
 }

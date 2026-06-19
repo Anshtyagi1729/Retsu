@@ -55,8 +55,17 @@ func (s *Server) handleEnq(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]string{"job_id": j.ID})
 }
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.queue.Stats(r.Context())
+	if err != nil {
+		http.Error(w, "could not get stats", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(stats)
+}
 func (s *Server) Start(addr string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /queue", s.handleEnq)
+	mux.HandleFunc("GET /stats", s.handleStats)
 	return http.ListenAndServe(addr, mux)
 }
