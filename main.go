@@ -25,6 +25,7 @@ func main() {
 		}
 	}()
 	go w.RunScheduler(ctx)
+	go w.RunWatchdawg(ctx)
 	log.Println("workers are starting")
 	w.StartPool(ctx, 5)
 	log.Println("shutdown")
