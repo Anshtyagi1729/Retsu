@@ -16,8 +16,6 @@ import (
 
 const webhookTimeout = 10 * time.Second
 
-const inflightTimeout = 5 * time.Minute
-
 type Worker struct {
 	queue *queue.Queue
 }
@@ -123,7 +121,7 @@ func (w *Worker) RunScheduler(ctx context.Context) {
 		}
 	}
 }
-func (w *Worker) RunWatchdawg(ctx context.Context) {
+func (w *Worker) RunWatchdawg(ctx context.Context, inflightTimeout time.Duration) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {

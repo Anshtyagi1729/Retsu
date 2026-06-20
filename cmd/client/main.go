@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"retsu/job"
 
 	"github.com/google/uuid"
 )
 
-const url = "http://localhost:8080/queue"
-
 func main() {
+	baseURL := os.Getenv("RETSU_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+	url := baseURL + "/queue"
 	for range 20 {
 		p := job.PaymentPayload{
 			UserID:    uuid.NewString(),
