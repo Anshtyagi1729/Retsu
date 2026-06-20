@@ -42,6 +42,10 @@ retsu:dlq            (List)
 
 **Pluggable processors** — jobs aren't hardcoded to payments. Each job type registers its own handler; the worker looks it up by `type`.
 
+**Graceful shutdown** — `SIGINT`/`SIGTERM` drains in-flight HTTP requests before exiting. Workers block forever on `XReadGroup` (`Block: 0`); plain context cancellation can't interrupt that read, so shutdown closes the Redis connection itself to unblock them.[^4]
+
+**Configurable via env vars** — no more hardcoded address/port/pool size. See [Configuration](#configuration).
+
 ---
 
 ## Quickstart
@@ -75,6 +79,21 @@ Watch the stats:
 ```bash
 curl http://localhost:8080/stats
 ```
+
+---
+
+## Configuration
+
+All optional, all fall back to the defaults below if unset.
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `REDIS_ADDR` | `localhost:6379` | Redis connection address |
+| `HTTP_ADDR` | `:8080` | address the API + dashboard listen on |
+| `WORKER_POOL_SIZE` | `20` | number of consumer goroutines |
+| `SHUTDOWN_TIMEOUT_SECONDS` | `10` | how long to wait for in-flight HTTP requests to finish on shutdown |
+| `INFLIGHT_TIMEOUT_SECONDS` | `300` | how long a job can sit unacked before the watchdog reclaims it |
+| `RETSU_URL` | `http://localhost:8080` | (test client only) which server to fire test jobs at |
 
 ---
 
@@ -158,18 +177,29 @@ cmd/client/main.go   test client — fires 20 jobs at the server
 
 ## Known issues
 
+No tests. This is the biggest gap before this should be trusted with anything real.
+
+No auth on any endpoint — anyone who can reach the port can enqueue jobs or read any job's status by ID.
+
 The stream never trims — acked entries stay in it, so `XLEN` only grows. Not a correctness issue, just an eventual disk-space one. `XTRIM` is the fix and isn't in yet.
 
 The DLQ has no inspection or replay endpoint. Jobs go in, nothing comes out.
 
+No Docker/Compose setup — "you need Redis running locally" is friction for anyone but the person who wrote this.
+
 ---
 
-## What's next (v3)
+## What's next
 
+- Tests
+- Auth
 - Trim the stream
 - DLQ inspection and requeue endpoints
+- Docker Compose
 - Webhook retries
 - Priority queues
+
+This is a work in progress — being picked back up later(i hope).
 
 ---
 
