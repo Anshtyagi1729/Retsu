@@ -68,6 +68,7 @@ func (w *Worker) Start(ctx context.Context, consumer string) {
 			j.Status = job.StatusSucceeded
 			w.queue.SetJobStatus(ctx, j)
 			w.queue.Ack(ctx, msg.ID)
+			w.queue.IncrDone(ctx)
 			go sendWebhook(j)
 		}
 	}

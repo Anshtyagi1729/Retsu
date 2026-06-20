@@ -23,6 +23,7 @@ const (
 	idemTTL    = 24 * time.Hour
 	jobKeyFmt  = "retsu:job:%s"
 	jobTTL     = 7 * 24 * time.Hour
+	DoneKey    = "retsu:stats:done"
 )
 
 // ErrJobNotFound is returned by GetJob when no status has been recorded
@@ -34,6 +35,7 @@ type Stats struct {
 	Inflight int64 `json:"inflight"`
 	Retry    int64 `json:"retry"`
 	DLQ      int64 `json:"dlq"`
+	Done     int64 `json:"done"`
 }
 
 // Msg is a job pulled off the stream, still tagged with the entry ID the
@@ -229,6 +231,13 @@ func (q *Queue) InflightCleanup(ctx context.Context, timeout time.Duration) erro
 	}
 	return nil
 }
+
+// IncrDone bumps the all-time count of successfully completed jobs. Called
+// once per success, never decremented - it's a counter, not a queue depth.
+func (q *Queue) IncrDone(ctx context.Context) error {
+	return q.client.Incr(ctx, DoneKey).Err()
+}
+
 func (q *Queue) Stats(ctx context.Context) (Stats, error) {
 	groups, err := q.client.XInfoGroups(ctx, StreamKey).Result()
 	if err != nil {
@@ -250,5 +259,9 @@ func (q *Queue) Stats(ctx context.Context) (Stats, error) {
 	if err != nil {
 		return Stats{}, err
 	}
-	return Stats{Pending: pending, Inflight: inflight, Retry: retry, DLQ: dlq}, nil
+	done, err := q.client.Get(ctx, DoneKey).Int64()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return Stats{}, err
+	}
+	return Stats{Pending: pending, Inflight: inflight, Retry: retry, DLQ: dlq, Done: done}, nil
 }
