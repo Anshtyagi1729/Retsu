@@ -181,11 +181,11 @@ No tests. This is the biggest gap before this should be trusted with anything re
 
 No auth on any endpoint — anyone who can reach the port can enqueue jobs or read any job's status by ID.
 
-The stream never trims — acked entries stay in it, so `XLEN` only grows. Not a correctness issue, just an eventual disk-space one. `XTRIM` is the fix and isn't in yet.
+The stream never trims — acked entries stay in it, so `XLEN` only grows. Not a correctness issue, just an eventual disk-space one. `XTRIM` is the fix and isn't in yet(need something like pg runner which cleans in chunks).
 
 The DLQ has no inspection or replay endpoint. Jobs go in, nothing comes out.
 
-No Docker/Compose setup — "you need Redis running locally" is friction for anyone but the person who wrote this.
+No Docker/Compose setup — "you need Redis running locally" is friction for anyone but the person who wrote this(me).
 
 ---
 
