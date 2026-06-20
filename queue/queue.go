@@ -49,6 +49,15 @@ type Queue struct {
 	client *redis.Client
 }
 
+// Close shuts down the underlying Redis connection(s). A blocking command
+// with Block: 0 only ever returns on real data or a closed connection -
+// plain context cancellation has no deadline to convert into a socket
+// read deadline, so it never interrupts the read by itself. Closing the
+// client is what actually unblocks workers stuck in ReadGroup on shutdown.
+func (q *Queue) Close() error {
+	return q.client.Close()
+}
+
 func New(addr string) *Queue {
 	client := redis.NewClient(&redis.Options{Addr: addr})
 	q := &Queue{client: client}

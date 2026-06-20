@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -23,11 +24,23 @@ var staticFS embed.FS
 // so clients creates a jpob pushes that to this producer which pushes to queue
 
 type Server struct {
-	queue *queue.Queue
+	queue      *queue.Queue
+	httpServer *http.Server
 }
 
 func New(q *queue.Queue) *Server {
-	return &Server{queue: q}
+	s := &Server{queue: q}
+	static, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /queue", s.handleEnq)
+	mux.HandleFunc("GET /stats", s.handleStats)
+	mux.HandleFunc("GET /jobs/{id}", s.handleJobStatus)
+	mux.Handle("GET /", http.FileServerFS(static))
+	s.httpServer = &http.Server{Handler: mux}
+	return s
 }
 
 // EnqueueRequest is the type-agnostic envelope every job goes through.
@@ -114,15 +127,16 @@ func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(j)
 }
+// Start blocks serving HTTP until Shutdown is called (or the listener
+// fails outright). It returns http.ErrServerClosed on a clean shutdown -
+// callers should treat that as success, not an error to log.
 func (s *Server) Start(addr string) error {
-	static, err := fs.Sub(staticFS, "static")
-	if err != nil {
-		return err
-	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /queue", s.handleEnq)
-	mux.HandleFunc("GET /stats", s.handleStats)
-	mux.HandleFunc("GET /jobs/{id}", s.handleJobStatus)
-	mux.Handle("GET /", http.FileServerFS(static))
-	return http.ListenAndServe(addr, mux)
+	s.httpServer.Addr = addr
+	return s.httpServer.ListenAndServe()
+}
+
+// Shutdown stops accepting new connections immediately and waits (up to
+// ctx's deadline) for in-flight requests to finish before returning.
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
 }
